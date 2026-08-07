@@ -1,0 +1,128 @@
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: #0f172a;
+  color: #e2e8f0;
+  font: 14px/1.5 -apple-system, system-ui, sans-serif;
+  padding: 48px 16px;
+}
+
+.card {
+  width: 100%;
+  max-width: 480px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 28px;
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  color: #5eead4;
+}
+
+.lead {
+  margin: 0 0 24px;
+  color: #94a3b8;
+}
+
+.field {
+  display: block;
+  margin-bottom: 20px;
+}
+
+.field > span {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.field input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #e2e8f0;
+  font-size: 14px;
+  outline: none;
+}
+
+.field input:focus {
+  border-color: #14b8a6;
+}
+
+.field small {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+}
+
+code {
+  background: #0f172a;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #5eead4;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.btn {
+  background: #334155;
+  color: #e2e8f0;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: #475569;
+}
+
+.btn-primary {
+  background: #14b8a6;
+  color: #042f2e;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: #2dd4bf;
+}
+
+.status {
+  margin-top: 20px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.status.info {
+  background: #0f172a;
+  color: #94a3b8;
+}
+
+.status.success {
+  background: #042f2e;
+  color: #5eead4;
+}
+
+.status.error {
+  background: #450a0a;
+  color: #fca5a5;
+}

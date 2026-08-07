@@ -1,0 +1,9 @@
+{
+  "name": "pricebuddy-companion-extension",
+  "private": true,
+  "type": "commonjs",
+  "description": "Tooling scope for the PriceBuddy Companion Chrome extension (Chrome ignores this file). Marks the directory as CommonJS so the panel view-model unit tests run under plain node.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

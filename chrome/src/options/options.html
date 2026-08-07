@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PriceBuddy Companion — Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="card">
+      <h1>🛒 PriceBuddy Companion</h1>
+      <p class="lead">Connect to your PriceBuddy instance to live-test store scrape strategies.</p>
+
+      <label class="field">
+        <span>API URL</span>
+        <input id="apiUrl" type="url" placeholder="https://price-buddy.example.com" autocomplete="off" />
+        <small>Base URL of your PriceBuddy instance (no trailing <code>/api</code>).</small>
+      </label>
+
+      <label class="field">
+        <span>API token</span>
+        <input id="token" type="password" placeholder="Bearer token" autocomplete="off" />
+        <small>
+          Create one in PriceBuddy under your profile / API keys. For the full
+          companion (add/update stores and track products) use an
+          <strong>all-access</strong> token. A token limited to
+          <code>user:detail</code> + <code>meta-extraction:extract</code> only
+          supports auto-detect.
+        </small>
+      </label>
+
+      <div class="actions">
+        <button id="save" class="btn btn-primary">Save</button>
+        <button id="test" class="btn">Test connection</button>
+      </div>
+
+      <div id="status" class="status" hidden></div>
+    </main>
+
+    <script src="options.js"></script>
+  </body>
+</html>
