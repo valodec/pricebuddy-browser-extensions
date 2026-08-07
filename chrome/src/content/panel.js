@@ -328,8 +328,68 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Fonts
+  //
+  // Bundled locally (see fonts/README.md) so opening the panel never reaches out
+  // to a third party from whatever page the user is on. `@font-face` inside a
+  // shadow root isn't honoured reliably across Chrome versions, so the faces are
+  // registered against the document's font set instead — the shadow root then
+  // picks them up by family name. Purely cosmetic: if anything here fails the
+  // panel falls back to the system stack already declared in PANEL_CSS.
+  // ---------------------------------------------------------------------------
+
+  const FONT_FACES = [
+    ['Manrope', 'fonts/manrope-variable.woff2', { weight: '200 800' }],
+    ['DM Mono', 'fonts/dm-mono-400.woff2', { weight: '400' }],
+    ['DM Mono', 'fonts/dm-mono-500.woff2', { weight: '500' }],
+  ];
+
+  let fontsRequested = false;
+
+  function loadFonts() {
+    if (fontsRequested || typeof FontFace === 'undefined' || !document.fonts) {
+      return;
+    }
+    fontsRequested = true;
+    for (const [family, path, descriptors] of FONT_FACES) {
+      try {
+        const face = new FontFace(family, `url(${chrome.runtime.getURL(path)})`, {
+          style: 'normal',
+          display: 'swap',
+          ...descriptors,
+        });
+        face.load().then(
+          (loaded) => document.fonts.add(loaded),
+          () => {}, // host-page CSP can block the load; system fonts are fine
+        );
+      } catch {
+        // Ignore — cosmetic only.
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Tiny DOM helpers
   // ---------------------------------------------------------------------------
+
+  // Only ever hand http(s) URLs to window.open / href. Values arrive from the
+  // user's PriceBuddy instance and from the API URL they typed, so a stray
+  // `javascript:` should never become clickable.
+  function safeUrl(url) {
+    try {
+      const parsed = new URL(String(url), location.href);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function openExternal(url) {
+    const href = safeUrl(url);
+    if (href) {
+      window.open(href, '_blank', 'noopener,noreferrer');
+    }
+  }
 
   function el(tag, props = {}, children = []) {
     const node = document.createElement(tag);
@@ -623,9 +683,9 @@
         el('span', { className: 'pb-verdict-headline', textContent: vm.verdict.headline }),
       ]));
       card.append(el('div', { className: 'pb-verdict-detail', textContent: vm.verdict.detail }));
-      if (vm.verdict.cta) {
+      if (vm.verdict.cta && safeUrl(vm.verdict.cta.url)) {
         const cta = el('button', { className: 'pb-verdict-cta', textContent: vm.verdict.cta.label });
-        cta.addEventListener('click', () => window.open(vm.verdict.cta.url, '_blank'));
+        cta.addEventListener('click', () => openExternal(vm.verdict.cta.url));
         card.append(cta);
       }
       box.append(card);
@@ -669,9 +729,9 @@
           el('span', { className: 'pb-spacer' }),
           r.isBest ? el('span', { className: 'pb-badge pb-badge-best', textContent: 'BEST' }) : null,
         ]);
-        if (r.url) {
+        if (safeUrl(r.url)) {
           row.classList.add('pb-store-link');
-          row.addEventListener('click', () => window.open(r.url, '_blank'));
+          row.addEventListener('click', () => openExternal(r.url));
         }
         list.append(row);
       }
@@ -687,14 +747,17 @@
       ]));
     }
 
-    if (apiBase && vm.productId) {
-      const link = el('a', {
+    const productHref = apiBase && vm.productId
+      ? safeUrl(`${apiBase}/admin/products/${encodeURIComponent(vm.productId)}`)
+      : null;
+    if (productHref) {
+      box.append(el('a', {
         className: 'pb-open-link',
         textContent: 'Open in PriceBuddy →',
-        href: `${apiBase}/admin/products/${vm.productId}`,
+        href: productHref,
         target: '_blank',
-      });
-      box.append(link);
+        rel: 'noopener noreferrer',
+      }));
     }
   }
 
@@ -1030,6 +1093,7 @@
   // ---------------------------------------------------------------------------
 
   async function buildPanel() {
+    loadFonts();
     host = document.createElement('div');
     host.id = 'pricebuddy-companion-host';
     host.style.cssText = 'all: initial; position: fixed; top: 16px; right: 16px; z-index: 2147483647;';
@@ -1057,8 +1121,10 @@
     header.append(themeBtn, closeBtn);
     panel.append(header);
 
+    // Note: the service worker deliberately withholds the API token here — the
+    // panel only needs the base URL for building links. See getPublicSettings().
     const settings = await send({ type: 'pb:get-settings' });
-    if (!settings.ok || !settings.data || !settings.data.apiUrl || !settings.data.token) {
+    if (!settings.ok || !settings.data || !settings.data.configured) {
       const setup = el('div', { className: 'pb-setup' }, [
         el('p', { className: 'pb-setup-text', textContent: 'Connect this extension to your PriceBuddy instance to get started.' }),
       ]);
@@ -1116,8 +1182,6 @@
   // ---------------------------------------------------------------------------
 
   const PANEL_CSS = `
-    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
-
     .pb-panel { --bg:#0d1117; width: 400px; max-width: calc(100vw - 32px); max-height: 88vh; overflow-y: auto;
       background: var(--bg); color: var(--text); border-radius: 18px; border: 1px solid var(--frame);
       box-shadow: 0 24px 60px -24px rgba(0,0,0,.55); font-family: Manrope, system-ui, sans-serif; box-sizing: border-box; }

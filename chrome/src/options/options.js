@@ -17,6 +17,24 @@ function readForm() {
   };
 }
 
+// The saved URL is later used to build clickable links in the in-page panel, so
+// reject anything that isn't a plain http(s) origin before it can be stored.
+function apiUrlError(apiUrl) {
+  let parsed;
+  try {
+    parsed = new URL(apiUrl);
+  } catch {
+    return 'Enter a full URL, e.g. https://price-buddy.example.com';
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return 'The API URL must start with http:// or https://';
+  }
+  if (/\/api$/i.test(parsed.pathname)) {
+    return 'Drop the trailing /api — enter just the base URL of your instance.';
+  }
+  return null;
+}
+
 async function load() {
   const stored = await chrome.storage.sync.get(SETTINGS_KEY);
   const settings = stored[SETTINGS_KEY] || { apiUrl: '', token: '' };
@@ -28,6 +46,11 @@ async function save() {
   const settings = readForm();
   if (!settings.apiUrl || !settings.token) {
     showStatus('Both an API URL and a token are required.', 'error');
+    return false;
+  }
+  const urlError = apiUrlError(settings.apiUrl);
+  if (urlError) {
+    showStatus(urlError, 'error');
     return false;
   }
   await chrome.storage.sync.set({ [SETTINGS_KEY]: settings });

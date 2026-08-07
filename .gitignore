@@ -1,0 +1,12 @@
+# Build output / release packages
+*.zip
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

@@ -1,8 +1,12 @@
 # PriceBuddy Companion (Chrome extension)
 
 A Manifest V3 Chrome extension that turns any product page into a live workbench
-for your [PriceBuddy](../../) instance. It talks to PriceBuddy over its HTTP API
-using a URL + token you configure — no code changes to the running site required.
+for your [PriceBuddy](https://github.com/jez500/pricebuddy) instance. It talks to
+PriceBuddy over its HTTP API using a URL + token you configure — no code changes
+to the running site required.
+
+> **You need your own PriceBuddy server.** This extension is a client; it does
+> nothing on its own.
 
 > **Status: prototype.** Built as a proof of concept. The store-strategy helper
 > and live extraction run against the officially scoped `meta-extraction` API and
@@ -60,8 +64,7 @@ The scrape-strategy workbench, in two modes:
 
 1. Open `chrome://extensions` in Chrome (or any Chromium browser).
 2. Enable **Developer mode** (top-right).
-3. Click **Load unpacked** and select this directory
-   (`browser-extensions/chrome`).
+3. Click **Load unpacked** and select this directory (`chrome/`).
 4. The 🛒 PriceBuddy icon appears in the toolbar.
 
 ## Configure
@@ -81,11 +84,27 @@ The scrape-strategy workbench, in two modes:
 
 ## Usage
 
-1. Navigate to a product page on any store.
-2. Click the 🛒 toolbar icon to open the panel.
-3. **Pick** or type selectors for title/price/image → **Test extraction**.
-4. Iterate until all three resolve, then **Copy config** into PriceBuddy — or
-   **Track this product** to start monitoring it immediately.
+### Track a product
+
+1. Navigate to a product page and click the 🛒 toolbar icon.
+2. The panel opens on **Track** (or **Insights**, if the page is already tracked)
+   and shows the title, image and the price it detected.
+3. Press **Track this product**. You land on **Insights**.
+
+### Tune a store's scrape strategy
+
+1. Open the panel and switch to the **Tune** tab.
+2. **Auto-detect** shows what PriceBuddy resolved for each field on its own. If
+   all three are found, you're done — press **Save to store**.
+3. If a field is missing, switch to **Manual override**. For that field either
+   press **◎ Pick on page** and click the element (Esc cancels), or choose a
+   strategy type and type the selector yourself.
+4. Press **Test all** to scrape the live page with your draft strategy. Each
+   field shows *matched* with the extracted value, or *no match*.
+5. Iterate until all three match, then press **Save to store** (it reads
+   **Update &lt;store&gt;** when a store already exists for this domain).
+
+Your draft is saved per-domain as you type, so it survives a page reload.
 
 ## How it's wired
 
@@ -97,6 +116,7 @@ The scrape-strategy workbench, in two modes:
 | `src/content/panel.js` | In-page Shadow-DOM panel (Track / Insights / Tune tabs) + element picker. Lives in the page so clicking elements never dismisses the UI. |
 | `src/content/viewmodels.js` | Pure data transforms (theme tokens, sparkline path, Insights/Track view-models). Loaded before the panel as `window.PBView`; unit-tested under `node --test`. |
 | `src/options/*` | Settings page (API URL + token, stored in `chrome.storage.sync`). |
+| `fonts/*` | Self-hosted Manrope + DM Mono (OFL). See `fonts/README.md`. |
 
 Settings and the theme choice live in `chrome.storage.sync`; per-page strategy
 drafts live in `chrome.storage.local` keyed by host, so your work survives reloads
@@ -105,16 +125,37 @@ and re-picks.
 The data transforms in `src/content/viewmodels.js` are pure and covered by tests:
 
 ```
-cd browser-extensions/chrome && node --test
+cd chrome && npm test
 ```
+
+## Security notes
+
+- **The API token never leaves the service worker.** Every authenticated request
+  is made in `src/background.js`; the in-page panel is only told the base URL and
+  whether the extension is configured (`getPublicSettings`). Since the panel runs
+  as a content script on every site you visit, keeping the credential out of that
+  context matters.
+- **Fonts are bundled, not fetched.** The panel would otherwise pull Manrope and
+  DM Mono from Google's CDN from whatever page you're on, leaking your browsing to
+  a third party and breaking on sites with a strict `style-src` CSP.
+- **All rendering goes through `textContent`**, never `innerHTML`, so nothing your
+  PriceBuddy instance returns can execute in a page.
+- **URLs are scheme-checked** before becoming a link or reaching `window.open`
+  (`safeUrl` in `panel.js`, `apiUrlError` in `options.js`) — http/https only.
 
 ## Permissions
 
 - `storage` — save settings and per-site drafts.
-- `tabs`, `scripting` — toggle/inject the panel from the toolbar icon.
+- `scripting` — inject the panel into the current tab from the toolbar icon,
+  including tabs that were already open when the extension was installed.
 - `host_permissions: <all_urls>` — required so the service worker can reach the
   *user-configured* PriceBuddy origin (unknown at build time) and so the helper
   can run on arbitrary store pages.
+- `web_accessible_resources` — the three bundled font files only, with
+  `use_dynamic_url` so the URLs rotate per session and can't fingerprint you.
+
+`tabs` is deliberately **not** requested: `chrome.tabs.sendMessage` needs host
+access, not that permission.
 
 ## API endpoints used
 
@@ -131,7 +172,19 @@ cd browser-extensions/chrome && node --test
 
 - Price-history matching compares the page URL against tracked URLs by
   `host + pathname`; heavily parameterised URLs may not match.
+- **Only the first 100 tracked products are searched** when deciding whether the
+  current page is already tracked. Past that, a tracked page can be reported as
+  untracked, and tracking it again creates a duplicate.
 - The element picker generates CSS selectors only (the API also supports XPath /
   Regex / JSON path — type those manually).
+- The picker cannot reach elements inside iframes or the page's own shadow roots,
+  which rules it out on some retailers.
+- Panel data is fetched once when the panel opens and is not refreshed on
+  client-side (SPA) navigation — reload the page after navigating.
+- **Saving in Tune writes all three fields**, so an untouched field can be
+  written back as `schema_org`. Check Auto-detect before saving over a store that
+  already works.
 - No build step or bundler; plain ES modules / scripts loaded directly.
-- Not packaged/signed for the Chrome Web Store.
+- Not yet published to the Chrome Web Store — see [`../PUBLISHING.md`](../PUBLISHING.md).
+
+Tracked work is in [`../TODO.md`](../TODO.md).

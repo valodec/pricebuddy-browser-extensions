@@ -12,6 +12,21 @@ async function getSettings() {
   return stored[SETTINGS_KEY] || { apiUrl: '', token: '' };
 }
 
+/**
+ * The public view of the settings — everything the in-page panel legitimately
+ * needs, with the token withheld. The panel runs as a content script on every
+ * site the user visits; it only ever uses `apiUrl` (to build product links) and
+ * `configured` (to decide whether to show the setup prompt), so there is no
+ * reason to copy the credential into that context. All authenticated calls are
+ * made here in the service worker instead.
+ *
+ * @returns {Promise<{apiUrl:string, configured:boolean}>}
+ */
+async function getPublicSettings() {
+  const { apiUrl, token } = await getSettings();
+  return { apiUrl: apiUrl || '', configured: Boolean(apiUrl && token) };
+}
+
 async function getClient() {
   return new PriceBuddyClient(await getSettings());
 }
@@ -38,13 +53,20 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 });
 
+// Messages carrying a caller-supplied token are only accepted from extension
+// pages (options), never from a content script. `sender.tab` is set for content
+// scripts and undefined for extension pages.
+function isExtensionPage(sender) {
+  return !sender.tab && sender.id === chrome.runtime.id;
+}
+
 // Message router for the panel + options page.
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     try {
       switch (message.type) {
         case 'pb:get-settings': {
-          sendResponse({ ok: true, data: await getSettings() });
+          sendResponse({ ok: true, data: await getPublicSettings() });
           break;
         }
         case 'pb:open-options': {
@@ -53,6 +75,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           break;
         }
         case 'pb:test-connection': {
+          if (!isExtensionPage(sender)) {
+            sendResponse({ ok: false, error: 'Not permitted from this context.' });
+            break;
+          }
           const client = new PriceBuddyClient(message.settings);
           const user = await client.getUser();
           sendResponse({ ok: true, data: user });

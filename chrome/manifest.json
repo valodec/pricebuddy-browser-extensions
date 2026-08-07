@@ -1,9 +1,12 @@
 {
   "manifest_version": 3,
   "name": "PriceBuddy Companion",
+  "short_name": "PriceBuddy",
   "version": "0.1.0",
-  "description": "Store scrape-strategy helper for PriceBuddy. Visually pick price/title/image elements on any product page and test them live against your PriceBuddy instance.",
-  "permissions": ["storage", "tabs", "scripting"],
+  "description": "Pick price/title/image selectors on any product page and test them live against your PriceBuddy instance.",
+  "homepage_url": "https://github.com/jez500/pricebuddy-browser-extensions",
+  "minimum_chrome_version": "102",
+  "permissions": ["storage", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "src/background.js",
@@ -35,8 +38,13 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["icons/icon16.png", "icons/icon48.png", "icons/icon128.png"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "fonts/manrope-variable.woff2",
+        "fonts/dm-mono-400.woff2",
+        "fonts/dm-mono-500.woff2"
+      ],
+      "matches": ["<all_urls>"],
+      "use_dynamic_url": true
     }
   ]
 }
