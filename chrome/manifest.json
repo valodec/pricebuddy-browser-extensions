@@ -6,8 +6,8 @@
   "description": "Pick price/title/image selectors on any product page and test them live against your PriceBuddy instance.",
   "homepage_url": "https://github.com/jez500/pricebuddy-browser-extensions",
   "minimum_chrome_version": "102",
-  "permissions": ["storage", "scripting"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": ["storage", "scripting", "activeTab"],
+  "optional_host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "src/background.js",
     "type": "module"
@@ -28,23 +28,5 @@
   "options_ui": {
     "page": "src/options/options.html",
     "open_in_tab": true
-  },
-  "content_scripts": [
-    {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/content/viewmodels.js", "src/content/panel.js"],
-      "run_at": "document_idle"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "fonts/manrope-variable.woff2",
-        "fonts/dm-mono-400.woff2",
-        "fonts/dm-mono-500.woff2"
-      ],
-      "matches": ["<all_urls>"],
-      "use_dynamic_url": true
-    }
-  ]
+  }
 }

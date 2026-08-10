@@ -81,5 +81,7 @@ notes. The "last updated" date above always reflects the current version.
 
 ## Contact
 
+PriceBuddy: <https://pricebuddy.app>
+
 Open an issue at
 <https://github.com/jez500/pricebuddy-browser-extensions/issues>.

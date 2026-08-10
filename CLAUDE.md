@@ -32,9 +32,10 @@ To run it: `chrome://extensions` → Developer mode → Load unpacked → pick
 
 ```
 toolbar click ──> background.js (service worker)
-                    │  chrome.tabs.sendMessage 'pb:toggle-panel'
+                    │  executeScript (activeTab) on first click,
+                    │  then chrome.tabs.sendMessage 'pb:toggle-panel'
                     v
-                  panel.js (content script, shadow DOM)
+                  panel.js (injected script, shadow DOM)
                     │  chrome.runtime.sendMessage 'pb:*'
                     v
                   background.js ──> PriceBuddyClient ──> user's PriceBuddy server
@@ -43,13 +44,14 @@ toolbar click ──> background.js (service worker)
 **The service worker is the only place that touches the network or the token.**
 The panel never holds the credential — `pb:get-settings` returns
 `getPublicSettings()`, which is `{apiUrl, configured}` with the token withheld.
-Preserve this. The panel is a content script on every site the user visits, so
+Preserve this. The panel is injected into whatever site the user is on, so
 anything it holds is exposed to that much more surface.
 
 Every API call is a `pb:*` message case in `background.js`'s router. To add an
 endpoint: add a method to `PriceBuddyClient`, then a case to the router. Do not
-`fetch` from the content script — the service worker has the host permissions and
-avoids CORS entirely.
+`fetch` from the injected script — the service worker holds the host permission
+for the user's instance and avoids CORS entirely. `getClient()` refuses with
+`needsPermission` if that grant is missing, rather than failing opaquely.
 
 ### File roles
 
@@ -58,7 +60,7 @@ avoids CORS entirely.
 | `src/background.js` | Service worker. Message router + panel toggle. Holds the token. |
 | `src/lib/api.js` | `PriceBuddyClient`. Thin, well-JSDoc'd HTTP wrapper. ESM. |
 | `src/content/viewmodels.js` | **Pure** transforms. No `chrome.*`, no DOM. UMD-ish: `module.exports` for tests, `window.PBView` in the page. |
-| `src/content/panel.js` | The panel: shadow DOM, three tabs, element picker, 175 lines of CSS in a template literal. Classic script, loaded after viewmodels.js. |
+| `src/content/panel.js` | The panel: shadow DOM, three tabs, element picker, capability gating, inline logo, ~175 lines of CSS in a template literal. Classic script, injected after viewmodels.js. |
 | `src/options/*` | Settings page. Plain script, not a module. |
 
 ### The viewmodels / panel split is the load-bearing convention
@@ -78,25 +80,62 @@ inside a render function, it belongs in `viewmodels.js` with a test.
   / `openExternal()` in `panel.js`, `apiUrlError()` in `options.js`.
 - **No remote resources.** No CDN scripts, styles, or fonts — it leaks the user's
   browsing to a third party from every page, breaks under strict host CSP, and is
-  a Chrome Web Store review risk. Fonts are bundled in `chrome/fonts/`.
-- **Don't add permissions casually.** Each one needs a written justification at
-  submission time and slows review. `tabs` was deliberately removed —
-  `chrome.tabs.sendMessage` needs host access, not that permission.
+  a Chrome Web Store review risk. The UI uses `system-ui`; there are no bundled
+  or remote fonts. CI greps for this.
+- **The extension ships with no host access.** `activeTab` covers the current tab
+  on toolbar click; the PriceBuddy origin is requested at runtime from the
+  options page. There is no registered content script — `background.js` injects
+  the panel with `chrome.scripting.executeScript`. Don't add `host_permissions`
+  or `content_scripts`; CI fails the build if you do.
+- **Don't add permissions casually.** Each needs a written justification in
+  `PUBLISHING.md` §4 and an entry in `ci.yml`'s allowlist. `tabs` was
+  deliberately removed — `chrome.tabs.sendMessage` needs host access, not that
+  permission.
 - **Panel CSS uses theme tokens only** (`var(--teal)`, `var(--text)`, …) defined
   in `THEMES` in `viewmodels.js` and applied to `.pb-panel` by `applyTheme()`.
-  Never hardcode a colour in `PANEL_CSS`; add a token to both palettes instead.
+  Never hardcode a colour in `PANEL_CSS`; add a token to **both** palettes (a
+  test asserts the two token sets match) and keep `options.css` in sync.
+  The palette mirrors PriceBuddy's Filament panel: primary `Color::Teal`,
+  Tailwind gray neutrals, `gray-950` page / `gray-900` cards in dark. A test
+  enforces WCAG AA contrast for every text token, so don't lighten one without
+  running it.
+- **The logo** is PriceBuddy's own wordmark, copied from
+  `../price-buddy/public/images/logo-full.svg`. It lives twice: inline in
+  `panel.js` as `LOGO_SVG` (so the extension needs no
+  `web_accessible_resources`) and as `chrome/images/logo-full.svg` for the
+  options page. Keep them in sync. Fills come from `--logo-symbol` /
+  `--logo-text`, matching the app's `_logo.scss`.
 - Two-space indent, semicolons, single quotes, trailing commas in multiline
   literals. Braces on every `if`.
 - Comments explain *why*, not *what* — the existing ones set the bar; match it.
 
 ## Backend API notes
 
-The PriceBuddy API is at `../pricebuddy` when checked out alongside. Gotchas:
+The PriceBuddy app is at `../price-buddy` when checked out alongside. Gotchas:
 
-- The store **list** transformer returns `scrape_strategy`; some responses use
-  `scrape_settings`. `panel.js:detectedField()` currently reads `scrape_settings`
-  off the meta-extraction response and this may be dead code — verify against a
-  live instance before touching it (see `TODO.md`).
+- **`scrape_strategy` vs `scrape_settings` — both are correct, don't "fix" it.**
+  `GET /api/stores` goes through Filament's `StoreTransformer`, which serialises
+  the raw model and yields **`scrape_strategy`**. `POST /api/meta-extraction`
+  goes through `MetaExtractionResource` → `App\Http\Resources\StoreResource`,
+  which deliberately renames the same data to **`scrape_settings`** to keep that
+  endpoint's public contract stable. Writes always take `scrape_strategy`. Both
+  call sites in `panel.js` carry a comment; leave them alone.
+- `dealScore` carries a **`verdictKey`** enum (`great|good|average|pricey|wait`)
+  alongside the human-readable `verdict`. Always branch on the key — the prose is
+  display copy. Also honour `lowConfidence`.
+- **URL matching is server-side and verified live.** `filter[url]` on products,
+  `current_url` → `is_current` per `price_cache` entry, and `filter[domain]`
+  (exact) on stores. All are gated behind `GET /api/client-config` capability
+  flags, with the old client-side paging kept only as a fallback for instances
+  that predate them. The extension normalises nothing on the happy path.
+- **`urls[].url` and `price_cache[].url` are not interchangeable.** The latter is
+  `buy_url`, i.e. affiliate-tagged (eBay picks up six params). **Match on
+  `urls[].url`; link out with `price_cache[].url`.** Matching the tagged form
+  works today only because `normalizeUrl` drops the entire query string — so do
+  not "improve" it to keep significant params without reading `TODO.md` first.
+  This distinction has produced a wrong conclusion twice.
+- Treat `V.normalizeUrl` as **fallback-only**; don't build on it. See `TODO.md`
+  for why it deliberately still strips the whole query string.
 - `POST /api/meta-extraction` accepts an optional `store` body to test a *draft*
   strategy without saving anything. This is what powers "Test all".
 - `POST /api/products` with `create_store: true` auto-builds a store from the URL.

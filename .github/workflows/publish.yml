@@ -1,0 +1,96 @@
+name: Publish to Chrome Web Store
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Submit for review after upload (false = upload as a draft only)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Configure this environment with a required reviewer so nothing reaches the
+    # store without a human approving the run. Secrets live here, not at repo
+    # level: CWS_EXTENSION_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN.
+    environment: chrome-web-store
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Unit tests
+        working-directory: chrome
+        run: npm test
+
+      - name: Resolve version
+        run: |
+          MANIFEST=$(node -p "require('./chrome/manifest.json').version")
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG="${GITHUB_REF_NAME#v}"
+            if [ "$TAG" != "$MANIFEST" ]; then
+              echo "::error::Tag v$TAG does not match manifest version $MANIFEST"
+              exit 1
+            fi
+          fi
+          echo "VERSION=$MANIFEST" >> "$GITHUB_ENV"
+          echo "Version $MANIFEST"
+
+      - name: Build package
+        run: |
+          cd chrome
+          zip -r "../pricebuddy-companion-${VERSION}.zip" . \
+            -x 'test/*' 'package.json' 'images/*' '*.DS_Store' '*/.*'
+          cd ..
+          unzip -l "pricebuddy-companion-${VERSION}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-zip
+          path: pricebuddy-companion-*.zip
+
+      - name: Upload to Chrome Web Store
+        env:
+          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          npx --yes chrome-webstore-upload-cli@3 upload \
+            --source "pricebuddy-companion-${VERSION}.zip" \
+            --extension-id "$EXTENSION_ID" \
+            --client-id "$CLIENT_ID" \
+            --client-secret "$CLIENT_SECRET" \
+            --refresh-token "$REFRESH_TOKEN"
+
+      # `upload` only replaces the draft. This is what starts the review, so it
+      # is deliberately separate: workflow_dispatch with publish=false lets you
+      # push a draft and inspect it in the dashboard first.
+      - name: Submit for review
+        if: github.ref_type == 'tag' || inputs.publish
+        env:
+          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          npx --yes chrome-webstore-upload-cli@3 publish \
+            --extension-id "$EXTENSION_ID" \
+            --client-id "$CLIENT_ID" \
+            --client-secret "$CLIENT_SECRET" \
+            --refresh-token "$REFRESH_TOKEN"
+
+      - name: GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pricebuddy-companion-*.zip
+          generate_release_notes: true

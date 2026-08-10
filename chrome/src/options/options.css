@@ -1,5 +1,49 @@
+/* Tokens mirror THEMES in src/content/viewmodels.js, which in turn mirrors the
+   PriceBuddy Filament panel (primary = Tailwind teal, neutrals = Tailwind gray).
+   Keep the two in sync — this page is the first thing a new user sees, so it
+   should not look like a different product from the panel.
+
+   Unlike the panel, this page follows the OS preference rather than the stored
+   theme choice: it's a normal extension page, so `color-scheme` gets us native
+   form controls and scrollbars in the right mode for free. */
+
 :root {
-  color-scheme: dark;
+  color-scheme: light dark;
+
+  --bg: #ffffff;
+  --card: #f9fafb;
+  --chip: #f3f4f6;
+  --input: #f3f4f6;
+  --line: rgba(3, 7, 18, 0.1);
+  --text: #030712;
+  --muted: #4b5563;
+  --faint: #6b7280;
+  --teal: #0f766e;
+  --on-teal: #ffffff;
+  --teal-dim: rgba(13, 148, 136, 0.1);
+  --red: #dc2626;
+  --red-bg: rgba(220, 38, 38, 0.08);
+  --logo-symbol: #2dd4bf;
+  --logo-text: #030712;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #030712;
+    --card: #111827;
+    --chip: #1f2937;
+    --input: #111827;
+    --line: rgba(249, 250, 251, 0.1);
+    --text: #f9fafb;
+    --muted: #9ca3af;
+    --faint: #8a929f;
+    --teal: #2dd4bf;
+    --on-teal: #042f2e;
+    --teal-dim: rgba(45, 212, 191, 0.14);
+    --red: #f87171;
+    --red-bg: rgba(248, 113, 113, 0.1);
+    --logo-text: #f9fafb;
+  }
 }
 
 body {
@@ -8,30 +52,38 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  background: #0f172a;
-  color: #e2e8f0;
-  font: 14px/1.5 -apple-system, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 system-ui, sans-serif;
   padding: 48px 16px;
 }
 
 .card {
   width: 100%;
   max-width: 480px;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--card);
+  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 28px;
 }
 
+.logo {
+  height: 28px;
+  width: auto;
+  display: block;
+  margin-bottom: 6px;
+}
+
 h1 {
   margin: 0 0 4px;
-  font-size: 20px;
-  color: #5eead4;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .lead {
   margin: 0 0 24px;
-  color: #94a3b8;
+  color: var(--muted);
 }
 
 .field {
@@ -48,31 +100,32 @@ h1 {
 .field input {
   width: 100%;
   box-sizing: border-box;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--input);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px 12px;
-  color: #e2e8f0;
-  font-size: 14px;
-  outline: none;
+  color: var(--text);
+  font: inherit;
 }
 
-.field input:focus {
-  border-color: #14b8a6;
+.field input:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+  border-color: var(--teal);
 }
 
 .field small {
   display: block;
   margin-top: 6px;
-  color: #64748b;
+  color: var(--faint);
 }
 
 code {
-  background: #0f172a;
+  background: var(--chip);
   padding: 1px 5px;
   border-radius: 4px;
-  font-size: 12px;
-  color: #5eead4;
+  font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--teal);
 }
 
 .actions {
@@ -82,27 +135,36 @@ code {
 }
 
 .btn {
-  background: #334155;
-  color: #e2e8f0;
-  border: none;
+  background: var(--chip);
+  color: var(--text);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px 18px;
-  font-size: 14px;
+  font: inherit;
   cursor: pointer;
 }
 
 .btn:hover {
-  background: #475569;
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
 }
 
 .btn-primary {
-  background: #14b8a6;
-  color: #042f2e;
+  background: var(--teal);
+  color: var(--on-teal);
+  border-color: var(--teal);
   font-weight: 600;
 }
 
 .btn-primary:hover {
-  background: #2dd4bf;
+  background: var(--teal);
+  color: var(--on-teal);
+  filter: brightness(1.08);
 }
 
 .status {
@@ -113,16 +175,16 @@ code {
 }
 
 .status.info {
-  background: #0f172a;
-  color: #94a3b8;
+  background: var(--chip);
+  color: var(--muted);
 }
 
 .status.success {
-  background: #042f2e;
-  color: #5eead4;
+  background: var(--teal-dim);
+  color: var(--teal);
 }
 
 .status.error {
-  background: #450a0a;
-  color: #fca5a5;
+  background: var(--red-bg);
+  color: var(--red);
 }

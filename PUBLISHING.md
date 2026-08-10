@@ -3,7 +3,7 @@
 This document covers everything from a first manual submission through to a fully
 automated GitHub Actions release pipeline.
 
-- [1. Before you can submit](#1-before-you-can-submit)
+- [1. Submission readiness](#1-submission-readiness)
 - [2. One-time account setup](#2-one-time-account-setup)
 - [3. Store listing assets](#3-store-listing-assets)
 - [4. Privacy & permission justifications](#4-privacy--permission-justifications)
@@ -17,24 +17,45 @@ automated GitHub Actions release pipeline.
 
 ---
 
-## 1. Before you can submit
+## 1. Submission readiness
 
-These are hard blockers — fix them before you spend money on a developer account.
+### Already done
 
-| # | Blocker | Detail |
-| - | ------- | ------ |
-| 1 | **`description` is 158 characters** | The Chrome Web Store rejects any `manifest.json` `description` over **132 characters**. Shorten it, e.g. `"Pick price/title/image selectors on any product page and test them live against your PriceBuddy instance."` (104 chars). |
-| 2 | **Remote font import** | `src/content/panel.js` does `@import url('https://fonts.googleapis.com/...')` inside the injected CSS. Reviewers treat remotely-fetched resources on every page visit as a privacy/remote-code concern, and it will be blocked outright on sites with a strict `style-src` CSP. Download Manrope + DM Mono into `chrome/fonts/`, add them to `web_accessible_resources`, and load them with `@font-face` using `chrome.runtime.getURL()`. |
-| 3 | **`<all_urls>` host permission + all-pages content script** | Legal, but it puts you in the slowest review queue and requires a written justification. See §4 for the wording, and consider the `activeTab` refactor described there — it materially improves approval odds. |
-| 4 | **Unused permissions** | `tabs` is not required for `chrome.tabs.sendMessage` (host access is enough), and `web_accessible_resources` exposes the icons even though the panel never loads them. Remove both. Reviewers explicitly check for over-requesting. |
-| 5 | **No privacy policy** | Mandatory because the extension handles an authentication token and page URLs. Host a page (GitHub Pages is fine) and paste its URL in the Privacy tab. |
-| 6 | **No LICENSE** | Not a store requirement, but you are publishing source publicly; pick one (MIT matches the rest of the PriceBuddy project). |
+These were blockers in the original audit and are all resolved. `.github/workflows/ci.yml`
+now enforces the first four, so they cannot silently come back:
 
-Also worth doing before submission, though not blocking:
+| # | Was | Now |
+| - | --- | --- |
+| 1 | `description` was 158 chars (store limit is 132) | 105 chars, CI-validated |
+| 2 | Google Fonts `@import` in the injected CSS | System font stack; no bundled or remote fonts. CI greps for remote resources |
+| 3 | `<all_urls>` host permission + content script on every page | `activeTab` + `optional_host_permissions`, requested per-origin at runtime |
+| 4 | Unused `tabs` permission and `web_accessible_resources` | Both removed; CI allowlists permissions |
+| 5 | No privacy policy | [`PRIVACY.md`](PRIVACY.md), published at <https://pricebuddy.app> |
+| 6 | No licence | MIT, [`LICENSE`](LICENSE) |
 
-- Add `"minimum_chrome_version": "102"` (MV3 service-worker `type: module` support).
-- Add `"short_name": "PriceBuddy"` for the toolbar/extension-menu display.
-- Add `"homepage_url"` pointing at the repo.
+`minimum_chrome_version`, `short_name` and `homepage_url` are all set.
+
+### Ready to submit
+
+Nothing outstanding blocks submission. `assets/screenshot.png` is 1280×800 and
+valid on its own; adding a second and third would make a stronger listing (up to
+5 are allowed).
+
+The two URLs the form asks for:
+
+- **Privacy policy URL** — <https://pricebuddy.app>
+- **Promotional video** — <https://www.youtube.com/watch?v=Iv_NELXQ1AE>
+
+Paste the video into **Notes for reviewer** as well as the video field. A reviewer
+with no PriceBuddy server otherwise sees only "Open settings", and the video is
+what shows them the round trip. Suggested note:
+
+> This extension is a client for PriceBuddy, a self-hosted price tracker
+> (<https://pricebuddy.app>), so it needs the reviewer's own server to do
+> anything. This 39-second video shows the full flow against a real instance —
+> tracking a product from an Amazon page through to it appearing in PriceBuddy:
+> https://www.youtube.com/watch?v=Iv_NELXQ1AE
+> Happy to provide credentials to a live demo instance on request.
 
 ---
 
@@ -62,7 +83,8 @@ save a draft without most of them.
 | Screenshots | 1280×800 (or 640×400) PNG/JPEG, **1–5 required** | Capture the Track, Insights and Tune tabs against a real product page. Do **not** include a browser chrome mockup with a fake URL bar — reviewers flag misleading imagery. |
 | Small promo tile | 440×280 PNG | Optional, but required to be eligible for any store featuring. |
 | Marquee promo tile | 1400×560 PNG | Optional. |
-| Detailed description | Plain text, up to 16,000 chars | Reuse the "What it does" section of `chrome/README.md`. State clearly in the **first paragraph** that the extension requires a self-hosted PriceBuddy instance — this pre-empts the most common user complaint and reviewer confusion. |
+| Promotional video | **YouTube URL only** — the field does not accept an upload | <https://www.youtube.com/watch?v=Iv_NELXQ1AE> |
+| Detailed description | Plain text, up to 16,000 chars | Reuse the "What it does" section of the root `README.md`. State clearly in the **first paragraph** that the extension requires a self-hosted PriceBuddy instance — this pre-empts the most common user complaint and reviewer confusion. |
 | Category | *Shopping* | |
 | Language | English | |
 
@@ -85,39 +107,48 @@ paste, worded the way reviewers expect (what it does + why nothing narrower work
   their light/dark preference, and per-site draft scraper configurations. No data
   leaves the user's browser except to the PriceBuddy server they configured."
 - **`scripting`** — "Injects the helper panel into the active tab when the user
-  clicks the toolbar icon, including on tabs that were already open when the
-  extension was installed or updated."
-- **`host_permissions: <all_urls>`** — "The extension talks to a PriceBuddy server
-  whose address is entered by the user at runtime and is therefore unknown at
-  build time. It also needs to read the DOM of arbitrary retailer product pages so
+  clicks the toolbar icon."
+- **`activeTab`** — "Grants access to the current tab only, and only when the user
+  clicks the extension's toolbar icon. The panel needs to read that page's DOM so
   the user can visually select the price/title/image elements to scrape. No page
   content is transmitted anywhere other than the user's own PriceBuddy server."
+- **`optional_host_permissions: <all_urls>`** — "The extension talks to a
+  PriceBuddy server whose address is entered by the user at runtime and is
+  therefore unknown at build time. Nothing is requested at install. When the user
+  saves their instance URL in the options page, permission is requested for **that
+  single origin**. `<all_urls>` is declared only because the address cannot be
+  known in advance; it is never requested wholesale."
+
+That last one is the important framing for a reviewer: the extension ships with
+**zero** host access and asks for one origin, chosen by the user, on an explicit
+action.
 
 **Data-use disclosures.** Tick *Authentication information* (the API token) and
 *Web history* (the page URL is sent to the user's PriceBuddy server for
 extraction). Then tick all three certification checkboxes. Under-disclosing here
 is the single most common cause of a takedown after approval.
 
-### Strongly recommended: reduce the permission surface first
+### The permission surface (already reduced)
 
-The current manifest injects a content script into **every** `http`/`https` page at
-`document_idle`, whether or not the user ever opens the panel. Switching to
-on-demand injection is a modest refactor and removes the largest review risk:
+The manifest ships no `host_permissions` and no `content_scripts`:
 
 ```jsonc
 {
   "permissions": ["storage", "scripting", "activeTab"],
-  "optional_host_permissions": ["<all_urls>"],
-  // remove the "content_scripts" block entirely — background.js already has
-  // an executeScript fallback path that does exactly this
-  // remove "tabs" and "web_accessible_resources"
+  "optional_host_permissions": ["<all_urls>"]
 }
 ```
 
-`activeTab` grants temporary host access to the tab the user clicked the toolbar
-icon on, which is precisely the trigger the extension already uses. You then
-request the user's PriceBuddy origin at runtime via
-`chrome.permissions.request({ origins: [apiUrl + '/*'] })` from the options page.
+`activeTab` grants temporary access to the tab the user clicked the icon on,
+which is exactly the extension's trigger — `background.js` injects the panel with
+`chrome.scripting.executeScript` at that point. The PriceBuddy origin is
+requested from the options page with
+`chrome.permissions.request({ origins: [apiUrl + '/*'] })`, which must be the
+first `await` in the click handler or Chrome drops the user gesture.
+
+`ci.yml` fails the build if `host_permissions` becomes non-empty or an
+unexpected permission appears, so this can't regress without a deliberate edit to
+the allowlist — and to these justifications.
 
 ---
 
@@ -129,7 +160,7 @@ containing it.
 ```bash
 cd chrome
 zip -r ../pricebuddy-companion-0.1.0.zip . \
-  -x 'test/*' 'package.json' '*.DS_Store' '*/.*'
+  -x 'test/*' 'package.json' 'images/*' '*.DS_Store' '*/.*'
 ```
 
 Verify before uploading:
@@ -139,8 +170,12 @@ unzip -l ../pricebuddy-companion-0.1.0.zip | head
 # manifest.json must appear at the top level, with no leading directory
 ```
 
-Excluding `test/` and `package.json` keeps the package to only what the browser
-loads. Chrome ignores them either way, but a smaller package reviews faster and
+Excluding `test/`, `package.json` and `images/` keeps the package to only what
+the browser loads. `images/` is build-time source: the wordmark is **inlined** in
+both `panel.js` and `options.html` (CSS custom properties don't cascade into an
+SVG loaded via `<img src>`, so it has to be), and `icon-symbol.svg` only exists
+to regenerate the toolbar PNGs. Nothing in the extension fetches either at
+runtime — the manifest declares no `web_accessible_resources` at all. Chrome ignores them either way, but a smaller package reviews faster and
 avoids questions about unused files.
 
 ---
@@ -246,53 +281,21 @@ Two workflows: one that validates every push, and one that publishes on a tag.
 
 ### 8a. CI — `.github/workflows/ci.yml`
 
-```yaml
-name: CI
+**Already committed.** Runs on every push and PR:
 
-on:
-  push:
-    branches: [main, master]
-  pull_request:
+- `npm test` (the view-model suite)
+- syntax-checks every source file, in the right parse mode (classic vs ESM)
+- validates the manifest: `manifest_version`, name ≤45, **description ≤132**,
+  version format, and that every file the manifest references actually exists
+- allowlists `permissions` and fails if `host_permissions` becomes non-empty —
+  adding one is then a deliberate edit to both the workflow and §4's
+  justifications
+- fails on remote resources (CDN fonts/scripts) and on `innerHTML` assigned
+  anything other than `''`
+- builds the zip and asserts `manifest.json` is at its root
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Unit tests
-        working-directory: chrome
-        run: npm test
-
-      - name: Validate manifest
-        working-directory: chrome
-        run: |
-          node -e '
-            const m = require("./manifest.json");
-            const fail = (msg) => { console.error("✗", msg); process.exitCode = 1; };
-            if (m.manifest_version !== 3) fail("manifest_version must be 3");
-            if (m.name.length > 45) fail(`name is ${m.name.length} chars (max 45)`);
-            if (m.description.length > 132)
-              fail(`description is ${m.description.length} chars (max 132)`);
-            if (!/^\d+(\.\d+){0,3}$/.test(m.version)) fail("version must be 1-4 dot-separated integers");
-            if (process.exitCode) process.exit(1);
-            console.log("✓ manifest OK");
-          '
-
-      - name: Reject remotely-hosted resources
-        run: |
-          if grep -rnE "https?://(fonts\.googleapis|cdn|unpkg|jsdelivr)" chrome/src; then
-            echo "::error::Remote resource reference found — bundle it locally."
-            exit 1
-          fi
-```
-
-The manifest validator catches exactly the 132-character failure that is live in
-the repo today, before it reaches a reviewer.
+The manifest and remote-resource checks exist because both of those shipped as
+real defects in the first version of this extension.
 
 ### 8b. Publish — `.github/workflows/publish.yml`
 
@@ -442,8 +445,15 @@ Rejections you are specifically exposed to:
 | *Functionality not demonstrable* | A reviewer with no PriceBuddy server sees only "Open settings" | Say so in the first line of the description, and put a demo server URL + read-only token in the **Notes for reviewer** field |
 
 That last one is the most likely rejection in practice. The reviewer must be able
-to see the extension work. Either stand up a demo PriceBuddy instance with a
-throwaway token in the reviewer notes, or record a screencast and link it there.
+to see the extension work.
+
+**This is covered.** <https://www.youtube.com/watch?v=Iv_NELXQ1AE> — 39s, no narration needed, ending on the tracked
+product inside PriceBuddy so the round trip is visible. Paste it into **Notes for
+reviewer** (wording in §1) as well as the video field in §3.
+
+Offering a demo instance with a throwaway token alongside it is still worth doing
+if you're willing to run one, since it lets a reviewer click through themselves
+rather than take the video's word for it.
 
 ---
 

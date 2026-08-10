@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Unit tests
+        working-directory: chrome
+        run: npm test
+
+      - name: Syntax check
+        working-directory: chrome
+        run: |
+          set -e
+          # Classic scripts (content scripts + options) and ES modules (service
+          # worker + api client) need different parse modes. package.json is
+          # commonjs so the tests run, which is why --input-type is needed here.
+          for f in src/content/panel.js src/content/viewmodels.js src/options/options.js; do
+            node --check "$f" && echo "ok  $f"
+          done
+          for f in src/background.js src/lib/api.js; do
+            node --input-type=module --check < "$f" && echo "ok  $f (esm)"
+          done
+
+      - name: Validate manifest
+        working-directory: chrome
+        run: |
+          node -e '
+            const fs = require("fs");
+            const m = require("./manifest.json");
+            let bad = false;
+            const fail = (msg) => { console.error("FAIL:", msg); bad = true; };
+
+            if (m.manifest_version !== 3) fail("manifest_version must be 3");
+            if (m.name.length > 45) fail(`name is ${m.name.length} chars (max 45)`);
+            if (m.description.length > 132)
+              fail(`description is ${m.description.length} chars (max 132)`);
+            if (!/^\d+(\.\d+){0,3}$/.test(m.version))
+              fail("version must be 1-4 dot-separated integers");
+
+            // Every file the manifest points at must exist, or the extension
+            // fails to load with an unhelpful error.
+            const refs = [
+              m.background?.service_worker,
+              m.options_ui?.page,
+              ...Object.values(m.icons ?? {}),
+              ...Object.values(m.action?.default_icon ?? {}),
+              ...(m.content_scripts ?? []).flatMap((c) => [...(c.js ?? []), ...(c.css ?? [])]),
+              ...(m.web_accessible_resources ?? []).flatMap((w) => w.resources ?? []),
+            ].filter(Boolean);
+            for (const ref of refs) {
+              if (!fs.existsSync(ref)) fail(`manifest references missing file: ${ref}`);
+            }
+
+            // Permissions are the main store-review risk; adding one should be a
+            // deliberate act that updates this list and the justifications in
+            // PUBLISHING.md, not something that slips in.
+            const allowed = ["storage", "scripting", "activeTab"];
+            for (const p of m.permissions ?? []) {
+              if (!allowed.includes(p))
+                fail(`unexpected permission "${p}" — update PUBLISHING.md justifications and this allowlist`);
+            }
+            if (m.host_permissions?.length)
+              fail("host_permissions should stay empty; use optional_host_permissions");
+
+            if (bad) process.exit(1);
+            console.log(`manifest OK — description ${m.description.length}/132 chars`);
+          '
+
+      - name: Reject remotely-hosted resources
+        run: |
+          # A CDN font or script leaks the user's browsing to a third party from
+          # every page the panel opens on, breaks under a strict host CSP, and is
+          # a Chrome Web Store review risk.
+          if grep -rnE "https?://(fonts\.(googleapis|gstatic)|cdn[a-z]*\.|unpkg|jsdelivr|ajax\.googleapis)" chrome/src chrome/manifest.json; then
+            echo "::error::Remote resource reference found — bundle it locally."
+            exit 1
+          fi
+          echo "no remote resources"
+
+      - name: Reject innerHTML with data
+        run: |
+          # The panel renders values from the user's PriceBuddy instance. The only
+          # sanctioned innerHTML is `= ''` to clear a container.
+          if grep -rnE "innerHTML\s*=" chrome/src | grep -vE "innerHTML\s*=\s*''"; then
+            echo "::error::innerHTML assigned something other than '' — use el()/textContent."
+            exit 1
+          fi
+          echo "no unsafe innerHTML"
+
+  package:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build package
+        run: |
+          cd chrome
+          zip -r ../pricebuddy-companion-ci.zip . \
+            -x 'test/*' 'package.json' 'images/*' '*.DS_Store' '*/.*'
+          cd ..
+          # manifest.json must be at the zip root, not inside a folder.
+          unzip -l pricebuddy-companion-ci.zip | head -20
+          unzip -l pricebuddy-companion-ci.zip | grep -qE " manifest\.json$" \
+            || { echo "::error::manifest.json is not at the zip root"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-zip
+          path: pricebuddy-companion-ci.zip
+          retention-days: 14

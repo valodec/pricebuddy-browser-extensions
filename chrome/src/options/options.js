@@ -42,17 +42,64 @@ async function load() {
   tokenInput.value = settings.token || '';
 }
 
+/** The host-permission pattern for a PriceBuddy base URL. */
+function originPattern(apiUrl) {
+  try {
+    return `${new URL(apiUrl).origin}/*`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Ask for access to the user's instance.
+ *
+ * The extension ships with no host permissions — the PriceBuddy address is
+ * unknown at build time, so it's requested here for that origin alone rather
+ * than taking `<all_urls>` up front.
+ *
+ * Must be the first `await` in a click handler: Chrome requires a user gesture,
+ * and awaiting anything else first (including `permissions.contains`) can lose
+ * it. Requesting an already-granted permission resolves true without prompting,
+ * so there's no need to check first.
+ */
+async function requestHostPermission(apiUrl) {
+  const origins = [originPattern(apiUrl)].filter(Boolean);
+  if (!origins.length) {
+    return false;
+  }
+  try {
+    return await chrome.permissions.request({ origins });
+  } catch {
+    return false;
+  }
+}
+
+function validate(settings) {
+  if (!settings.apiUrl || !settings.token) {
+    return 'Both an API URL and a token are required.';
+  }
+  return apiUrlError(settings.apiUrl);
+}
+
 async function save() {
   const settings = readForm();
-  if (!settings.apiUrl || !settings.token) {
-    showStatus('Both an API URL and a token are required.', 'error');
+  const invalid = validate(settings);
+  if (invalid) {
+    showStatus(invalid, 'error');
     return false;
   }
-  const urlError = apiUrlError(settings.apiUrl);
-  if (urlError) {
-    showStatus(urlError, 'error');
+
+  // Permission first — see requestHostPermission on why nothing may be awaited
+  // before it.
+  if (!(await requestHostPermission(settings.apiUrl))) {
+    showStatus(
+      `Access to ${settings.apiUrl} was declined. The extension can't reach your instance without it — press Save to try again.`,
+      'error',
+    );
     return false;
   }
+
   await chrome.storage.sync.set({ [SETTINGS_KEY]: settings });
   showStatus('Saved.', 'success');
   return true;
