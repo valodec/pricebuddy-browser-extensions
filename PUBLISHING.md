@@ -41,6 +41,12 @@ Nothing outstanding blocks submission. `assets/screenshot.png` is 1280×800 and
 valid on its own; adding a second and third would make a stronger listing (up to
 5 are allowed).
 
+⚠️ The per-tab captures already in `assets/` — `track.png`, `insights.png`,
+`tune.png` — are **598px wide and cannot be uploaded**: the store accepts only
+1280×800 or 640×400. They are fine in the README, but re-capture them at
+1280×800 (letterbox the panel onto an 1280×800 canvas) if you want them in the
+listing.
+
 The two URLs the form asks for:
 
 - **Privacy policy URL** — <https://pricebuddy.app>
@@ -123,10 +129,44 @@ That last one is the important framing for a reviewer: the extension ships with
 **zero** host access and asks for one origin, chosen by the user, on an explicit
 action.
 
-**Data-use disclosures.** Tick *Authentication information* (the API token) and
-*Web history* (the page URL is sent to the user's PriceBuddy server for
-extraction). Then tick all three certification checkboxes. Under-disclosing here
-is the single most common cause of a takedown after approval.
+The **single-purpose statement** the same tab asks for is in [§3](#3-store-listing-assets).
+
+### Are you using remote code?
+
+**No — select "No, I am not using remote code."** This is true and CI keeps it
+true: there is no `eval`, no `new Function`, no dynamic `import()`, no injected
+`<script src>`, and no CDN script, style or font anywhere in `chrome/src/`. The
+manifest declares no `web_accessible_resources`. If a free-text box appears:
+
+> All executable code is contained in the extension package. There is no eval, no
+> dynamically-constructed code, and no remotely-hosted script, style or font.
+> Responses from the user's PriceBuddy server are treated strictly as JSON data
+> and rendered with `textContent`, never as HTML or code.
+
+### What user data do you collect?
+
+Tick exactly two categories:
+
+- **Authentication information** — the PriceBuddy API token, held in
+  `chrome.storage.sync` and sent as an `Authorization: Bearer` header to the
+  user's own server.
+- **Web history** — the URL of the page the panel is opened on is sent to the
+  user's own PriceBuddy server so it can fetch and scrape that product page.
+
+Do **not** tick *Website content*. The page DOM is read locally for the element
+picker, but only the page URL and the CSS/XPath/regex selectors the user picks
+are ever transmitted — no page text, images, form data or cookies leave the
+device. Nothing at all goes to the developer: no analytics, no telemetry, no
+third parties.
+
+Then tick all three certification checkboxes. Under-disclosing here is the single
+most common cause of a takedown after approval; over-disclosing costs you a
+scarier permissions warning on the install dialog, so claim these two and no
+more.
+
+Keep this section, [`PRIVACY.md`](PRIVACY.md) and the README's *Permissions*
+section saying the same thing — a reviewer reads the privacy policy URL against
+the form, and a contradiction between them is a rejection.
 
 ### The permission surface (already reduced)
 
@@ -299,6 +339,9 @@ real defects in the first version of this extension.
 
 ### 8b. Publish — `.github/workflows/publish.yml`
 
+**Already committed.** Reproduced here so the design notes below have something
+to point at; if it drifts from the file, the file wins.
+
 ```yaml
 name: Publish to Chrome Web Store
 
@@ -345,7 +388,7 @@ jobs:
         run: |
           cd chrome
           zip -r "../pricebuddy-companion-${VERSION:-dev}.zip" . \
-            -x 'test/*' 'package.json' '*.DS_Store' '*/.*'
+            -x 'test/*' 'package.json' 'images/*' '*.DS_Store' '*/.*'
           cd ..
           unzip -l "pricebuddy-companion-${VERSION:-dev}.zip"
 
@@ -412,11 +455,11 @@ Notes on the design:
 
 ```bash
 # 1. Bump the version in chrome/manifest.json (e.g. 0.1.0 -> 0.2.0)
-# 2. Update CHANGELOG.md
 git commit -am "chore: release v0.2.0"
 git tag v0.2.0
-git push origin master --tags
-# 3. Approve the deployment in the Actions tab if you configured a reviewer
+git push origin main --tags
+# 2. Approve the deployment in the Actions tab if you configured a reviewer
+# Release notes are generated from the commit log by publish.yml.
 ```
 
 Chrome extension versions must be **1–4 dot-separated integers**, each 0–65535.
@@ -440,7 +483,7 @@ Rejections you are specifically exposed to:
 | --------- | ------------------- | --- |
 | *Requesting but not using permissions* | `tabs` and `web_accessible_resources` are declared but unused | Remove them (§1.4) |
 | *Broad host permissions not justified* | `<all_urls>` at install time | Move to `activeTab` + `optional_host_permissions` (§4) |
-| *Remotely hosted code* | The Google Fonts `@import` in the injected CSS | Bundle the fonts (§1.2) |
+| *Remotely hosted code* | The Google Fonts `@import` in the injected CSS | Dropped it for the system font stack (§1.2) — nothing is fetched at runtime |
 | *Inadequate privacy disclosure* | Token = authentication info; page URL = web history | Disclose both (§4) |
 | *Functionality not demonstrable* | A reviewer with no PriceBuddy server sees only "Open settings" | Say so in the first line of the description, and put a demo server URL + read-only token in the **Notes for reviewer** field |
 

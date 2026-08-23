@@ -67,9 +67,9 @@ Then, in either mode:
   best-effort, and it tells you when it gave up rather than failing silently.
 - **Manual override** — per field, choose a strategy type (Schema.org / CSS /
   XPath / Regex / JSON path) and a value. **◎ Pick on page** lets you click the
-  element and generates a resilient selector (preferring
-  `itemprop`/`data-testid`/stable classes, with `nth-of-type` fallback and
-  attribute extraction `|src` / `|content` / `|value`).
+  element and generates a resilient selector — preferring `itemprop`,
+  `data-testid`, `data-test` or `name` over generated class names, falling back
+  to `nth-of-type`, with attribute extraction `|src` / `|content` / `|value`.
 
 **Test all** scrapes the live page with your *draft* strategy — including the
 draft fetch method — and shows matched / no-match per field, so you can verify a
@@ -132,8 +132,10 @@ access, not that permission.
   is made in `src/background.js`; the panel is told only the base URL and whether
   the extension is configured. The panel is injected into arbitrary sites, so
   keeping the credential out of that context matters.
-- **No remote resources.** No CDN scripts, styles or fonts — the UI uses the
-  system font stack. CI fails the build if one appears.
+- **No remote code, no remote resources.** No CDN scripts, styles or fonts — the
+  UI uses the system font stack — and no `eval`, `new Function` or dynamic
+  `import()`. Everything the extension runs ships inside the package. CI fails
+  the build if a remote resource appears.
 - **All rendering goes through `textContent`**, never `innerHTML` with data, so
   nothing your instance returns can execute in a page. Also CI-enforced.
 - **URLs are scheme-checked** before becoming a link or reaching `window.open`.
@@ -153,10 +155,12 @@ chrome/            The Chrome (MV3) extension
   images/          PriceBuddy wordmark (from the app repo)
   test/            node --test unit tests for the view-models
 assets/            Store screenshot + screencast (not shipped in the extension)
+.github/workflows/ ci.yml (every push) and publish.yml (on a v* tag)
 CLAUDE.md          Working notes for AI coding agents
 PRIVACY.md         Privacy policy
 PUBLISHING.md      Chrome Web Store submission + GitHub Actions release guide
 TODO.md            Prioritised backlog
+LICENSE            MIT
 ```
 
 ## Development
