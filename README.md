@@ -8,7 +8,7 @@ Browser extensions that act as companion clients for a self-hosted
 
 | Browser | Directory | Status |
 | ------- | --------- | ------ |
-| Chrome / Chromium / Edge | [`chrome/`](chrome/) | Prototype — works, not yet published |
+| Chrome / Chromium / Edge | [`chrome/`](chrome/) | Published — [PriceBuddy Companion](https://chromewebstore.google.com/detail/pricebuddy-companion/khmeibbaaegidkjlkbckgnhfgpgfgnoe) on the Chrome Web Store |
 | Firefox | — | Not started |
 
 ## What it does
@@ -78,7 +78,14 @@ existing one.
 
 Drafts are saved per-domain as you type, so work survives a reload.
 
-## Install (developer / unpacked)
+## Install
+
+Install [PriceBuddy Companion](https://chromewebstore.google.com/detail/pricebuddy-companion/khmeibbaaegidkjlkbckgnhfgpgfgnoe)
+from the Chrome Web Store. It works in Chrome, Edge and other Chromium browsers.
+
+There is also a [user guide](https://pricebuddy.jez.me/browser-extension.html) in the PriceBuddy docs.
+
+### Developer / unpacked
 
 1. Open `chrome://extensions`.
 2. Enable **Developer mode** (top right).
