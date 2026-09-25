@@ -9,7 +9,7 @@ Browser extensions that act as companion clients for a self-hosted
 | Browser | Directory | Status |
 | ------- | --------- | ------ |
 | Chrome / Chromium / Edge | [`chrome/`](chrome/) | Published — [PriceBuddy Companion](https://chromewebstore.google.com/detail/pricebuddy-companion/khmeibbaaegidkjlkbckgnhfgpgfgnoe) on the Chrome Web Store |
-| Firefox | — | Not started |
+| Firefox (140+) | [`chrome/`](chrome/) — same folder, same manifest | Works when loaded manually (see below); not yet on addons.mozilla.org |
 
 ## What it does
 
@@ -91,6 +91,19 @@ There is also a [user guide](https://pricebuddy.jez.me/browser-extension.html) i
 2. Enable **Developer mode** (top right).
 3. **Load unpacked** → select `chrome/`.
 
+### Firefox (temporary add-on)
+
+The same `chrome/` folder loads in Firefox 140 or newer: the manifest lists the
+background script under both `service_worker` (used by Chrome) and `scripts`
+(used by Firefox), and each browser ignores the key it doesn't support.
+
+1. Open `about:debugging#/runtime/this-firefox`.
+2. **Load Temporary Add-on…** → select `chrome/manifest.json`.
+
+Firefox removes temporary add-ons when it restarts. For a permanent install
+the extension has to be signed by Mozilla (see the Firefox appendix in
+[`PUBLISHING.md`](PUBLISHING.md)).
+
 ## Configure
 
 1. Right-click the toolbar icon → **Options** (or open the panel and press
@@ -104,7 +117,7 @@ There is also a [user guide](https://pricebuddy.jez.me/browser-extension.html) i
    - **Track this product** and price history additionally need product access —
      use an **all access** (`*`) token. The panel surfaces a clear message when
      the token is too narrow (HTTP 403).
-4. Press **Save**. Chrome asks for permission to reach that address — the
+4. Press **Save**. The browser asks for permission to reach that address — the
    extension requests no site access until you grant it.
 5. **Test connection** verifies via `GET /api/user`.
 
@@ -152,7 +165,7 @@ See [`PRIVACY.md`](PRIVACY.md) for what is stored and what is sent where.
 ## Repository layout
 
 ```
-chrome/            The Chrome (MV3) extension
+chrome/            The MV3 extension (Chrome, Edge, and Firefox 140+)
   manifest.json
   src/
     background.js    Service worker: API proxy, permissions, panel toggle

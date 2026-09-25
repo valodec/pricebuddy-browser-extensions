@@ -9,8 +9,13 @@ A Manifest V3 Chrome extension that acts as a companion client for a self-hosted
 only** — all data lives on the user's own PriceBuddy server, reached over its
 HTTP API with a URL + token the user configures.
 
-Currently only `chrome/` exists. The repo name is plural because Firefox is
-planned; nothing has been factored for that yet.
+Currently only `chrome/` exists, and it also loads in Firefox 140+. The
+manifest declares the background script twice — `background.service_worker`
+for Chrome and `background.scripts` for Firefox — because each browser ignores
+the key it doesn't support (Chrome from 121, hence `minimum_chrome_version`;
+Firefox from 121). Keep both. `browser_specific_settings.gecko` carries the
+Firefox add-on ID, which must never change once published on AMO. Nothing else
+has been factored for a second browser yet.
 
 ## Commands
 
@@ -26,7 +31,9 @@ CommonJS so the tests run under plain node, and Firefox's AMO requires a source
 submission from anything with a build step.
 
 To run it: `chrome://extensions` → Developer mode → Load unpacked → pick
-`chrome/`.
+`chrome/`. In Firefox: `about:debugging#/runtime/this-firefox` → Load Temporary
+Add-on → pick `chrome/manifest.json`. `npx web-ext lint --source-dir chrome`
+checks the manifest against Firefox's rules.
 
 ## Architecture
 

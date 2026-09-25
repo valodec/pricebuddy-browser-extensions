@@ -341,9 +341,15 @@ by the suite, and that's where all of today's integration work landed.
 
 ## P5 — other browsers
 
-- [ ] Firefox: needs `browser_specific_settings` and an MV3
-      `background.scripts`/event-page shim. Keep the codebase build-step-free —
-      AMO requires source submission otherwise.
+- [x] Firefox: `browser_specific_settings.gecko` and `background.scripts`
+      added to the shared manifest; loads and works from `chrome/` in
+      Firefox 140+ with no code changes.
+- [ ] Firefox: publish to AMO. Before the first upload, confirm the add-on ID
+      (`pricebuddy-companion@jez.me` is a proposal) and the declared
+      `data_collection_permissions` (`browsingActivity`, because the current
+      page URL is sent to the user's own server). Then add a `web-ext sign`
+      job to `publish.yml`. Keep the codebase build-step-free — AMO requires
+      source submission otherwise.
 - [ ] Edge: accepts the Chrome zip nearly verbatim; add a job to `publish.yml`.
 - [ ] Factor a shared `src/` with per-browser manifests **before** the second
       copy exists, not after.

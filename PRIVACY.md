@@ -22,7 +22,9 @@ to the developer:
 `chrome.storage.sync` is synchronised by Chrome across the devices where you are
 signed in to the same Google profile. This means **your API token is synced by
 Chrome to your own Google account**. If you would rather it did not leave this
-device, turn off extension sync in Chrome's sync settings.
+device, turn off extension sync in Chrome's sync settings. In Firefox the same
+data is synced by Firefox Sync when you are signed in to a Mozilla account and
+add-on sync is enabled.
 
 Uninstalling the extension deletes all of the above.
 
